@@ -20,11 +20,10 @@ broadcastfd_setup()
 }
 
 int
-broadcast(int sockfd, moonlight_server *server)
+discover(int sockfd, struct sockaddr_in *addr)
 {
     int numbytes, rv = 0;
-    struct sockaddr_in their_addr;
-    socklen_t addr_len = sizeof(their_addr);
+    socklen_t addr_len = sizeof(*addr);
     struct hostent *host_entry;
 
     /* TODO: figure out address using subnet mask instead of spamming? */
@@ -32,47 +31,73 @@ broadcast(int sockfd, moonlight_server *server)
         perror("server (broadcast gethostbyname)");
     }
 
-    their_addr.sin_family = AF_INET;
-    their_addr.sin_port = htons(atoi(DISCOVER_PORT));
-    their_addr.sin_addr = *((struct in_addr *)host_entry->h_addr);
-    memset(their_addr.sin_zero, '\0', sizeof(their_addr.sin_zero));
+    addr->sin_family = AF_INET;
+    addr->sin_port = htons(atoi(DISCOVER_PORT));
+    addr->sin_addr = *((struct in_addr *)host_entry->h_addr);
+    memset(addr->sin_zero, '\0', sizeof(addr->sin_zero));
 
     u32 msg = htonl(MSG_BROADCAST);
 
     struct timeval tv = { .tv_sec = 5, .tv_usec = 0 };
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval));
 
-    if ((numbytes = sendto(sockfd, &msg, sizeof(msg), 0, (struct sockaddr *)&their_addr, sizeof(their_addr))) == -1) {
-        perror("server (broadcast sendto)");
+    if ((numbytes = sendto(sockfd, &msg, sizeof(msg), 0, (struct sockaddr *)addr, addr_len)) == -1) {
+        perror("client (broadcast sendto)");
     } else {
-        if ((numbytes = recvfrom(sockfd, &msg, sizeof(msg), 0, (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+        if ((numbytes = recvfrom(sockfd, &msg, sizeof(msg), 0, (struct sockaddr *)addr, &addr_len)) == -1) {
             perror("client (discover recvfrom)");
         } else {
             msg = ntohl(msg);
             if (msg == MSG_HANDSHAKE) {
-                // check if duplicate server
-                if (0) {
-
-                } else {
-                    // extract the IP of the sender
-                    printf("handshake received\n");
-                    their_addr.sin_port = htons(atoi(LISTEN_PORT));
-                    memcpy(&server->addr, &their_addr, addr_len);
-
-                    int hostfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-                    connect(hostfd, &their_addr, sizeof(their_addr));
-                    hostname(hostfd, &server->name);
-
-                    close(hostfd);
-
-                    rv = 1;
-                }
-
+                rv = 1;
             }
         }
     }
 
     return rv;
+}
+
+int
+is_duplicate_server(moonlight_server *servers, int server_count, struct sockaddr_in *addr)
+{
+    if (!servers || !addr) {
+        return 0;
+    }
+
+    moonlight_server *s;
+    for (int i = 0; i < server_count; ++i) {
+        // check server sockaddr_in
+        s = servers + i;
+        if (addr->sin_addr.s_addr == s->addr.sin_addr.s_addr) {
+            return 1;
+        }
+    }
+
+    return 0;
+
+}
+
+int
+add_server(moonlight_server *server, struct sockaddr_in *addr)
+{
+    int hostfd;
+    struct sockaddr_in *server_addr = &server->addr;
+    memcpy(server_addr, addr, sizeof(*server_addr));
+    server_addr->sin_port = htons(atoi(LISTEN_PORT));
+
+    if ((hostfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
+        perror("client (add_server socket)");
+    }
+
+    if (connect(hostfd, server_addr, sizeof(*server_addr)) == -1) {
+        perror("client (add_server connect)");
+    }
+
+    hostname(hostfd, &server->name);
+
+    close(hostfd);
+
+    return 0;
 }
 
 int
