@@ -74,7 +74,6 @@ is_duplicate_server(moonlight_server *servers, int server_count, struct sockaddr
     }
 
     return 0;
-
 }
 
 int
@@ -94,10 +93,46 @@ add_server(moonlight_server *server, struct sockaddr_in *addr)
     }
 
     hostname(hostfd, &server->name);
+    server->host_count = 0;
 
     close(hostfd);
 
     return 0;
+}
+
+int
+is_duplicate_host(host *hosts, int host_count, char *ip)
+{
+    if (!hosts || !ip) {
+        return 0;
+    }
+
+    host *h;
+    for (int i = 0; i < host_count; ++i) {
+        h = hosts + i;
+        if (strcmp(h->ip, ip) == 0) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int
+add_host(host *host, char *name, char *ip)
+{
+    int namelen = strlen(name) + 1;
+    int iplen = strlen(ip) + 1;
+
+    host->name = malloc(namelen);
+    host->ip = malloc(iplen);
+
+    memcpy(host->name, name, namelen);
+    memcpy(host->ip, ip, iplen);
+    host->is_paired = 0;
+    memcpy(&host->config, &default_config, sizeof(default_config));
+
+    return 1;
 }
 
 int

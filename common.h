@@ -52,15 +52,16 @@ static const host_config default_config = {
 
 typedef struct host {
     char *name;
+    char *ip;
     int is_paired;
-    struct addrinfo addr;
     host_config config;
 } host;
 
 typedef struct moonlight_server {
-    host *hosts;
+    host hosts[5];
     struct sockaddr_in addr;
     char *name;
+    int host_count;
 } moonlight_server;
 
 static int
