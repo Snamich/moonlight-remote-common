@@ -28,14 +28,14 @@
 #define MSG_BROADCAST 0x000000008
 #define MSG_HANDSHAKE 0x000000009
 
-#define MAXHOSTLENGTH 100
+#define MAXHOSTLEN 100
+#define MAXCMDLEN 200
 
 typedef struct host_config {
     int fps;
     int bitrate;
     int packetsize;
-    int width;
-    int height;
+    int resolution;
     int nsops;
     int localaudio;
 } host_config;
@@ -44,8 +44,7 @@ static const host_config default_config = {
     .fps = 60,
     .bitrate = 0,
     .packetsize = 0,
-    .width = 720,
-    .height = 1280,
+    .resolution = 720,
     .nsops = 0,
     .localaudio = 0
 };
@@ -54,6 +53,7 @@ typedef struct host {
     char *name;
     char *ip;
     int is_paired;
+    int servfd;
     host_config config;
 } host;
 
@@ -68,6 +68,9 @@ static int
 sendstr(int sockfd, char *str, int size)
 {
     int total = 0, numbytes = 0;
+
+    send(sockfd, &size, sizeof(size), 0);
+
     while (total < size) {
         if ((numbytes = send(sockfd, str + total, size - total, 0)) == -1) {
             perror("sendstr");
@@ -83,10 +86,12 @@ sendstr(int sockfd, char *str, int size)
 static int
 recstr(int sockfd, char *str, int size)
 {
-    int total = 0, numbytes = 0, nsize = size - 1;
+    int total = 0, numbytes = 0, strlen;
+
+    recv(sockfd, &strlen, sizeof(strlen), 0);
 
     do {
-        numbytes = recv(sockfd, str, nsize - total, 0);
+        numbytes = recv(sockfd, str, size - total, 0);
 
         if (numbytes == -1) {
             perror("recstr");
@@ -96,7 +101,7 @@ recstr(int sockfd, char *str, int size)
         }
 
         total += numbytes;
-    } while (total < nsize);
+    } while (total < size && total < strlen);
 
     return total;
 }

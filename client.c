@@ -1,8 +1,6 @@
 #include "common.h"
 #include "client.h"
 
-#define MAXCMD 100
-
 int
 broadcastfd_setup()
 {
@@ -17,6 +15,24 @@ broadcastfd_setup()
     }
 
     return sockfd;
+}
+
+int
+servfd_setup(moonlight_server *server)
+{
+    int servfd;
+    struct sockaddr_in *server_addr = &server->addr;
+    server_addr->sin_port = htons(atoi(LISTEN_PORT));
+
+    if ((servfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
+        perror("client (servfd_setup socket)");
+    }
+
+    if (connect(servfd, server_addr, sizeof(*server_addr)) == -1) {
+        perror("client (servfd_setup connect)");
+    }
+
+    return servfd;
 }
 
 int
@@ -126,10 +142,11 @@ add_host(host *host, char *name, char *ip)
 
     host->name = malloc(namelen);
     host->ip = malloc(iplen);
+    host->servfd = -1;
 
     memcpy(host->name, name, namelen);
     memcpy(host->ip, ip, iplen);
-    host->is_paired = 0;
+    host->is_paired = 1;
     memcpy(&host->config, &default_config, sizeof(default_config));
 
     return 1;
@@ -175,10 +192,17 @@ list(int sockfd)
 }
 
 int
-launch(int sockfd)
+launch(int sockfd, host *host, char *app)
 {
     u32 msg = htonl(MSG_LAUNCH);
     send(sockfd, &msg, sizeof(msg), 0);
+
+    char cmd[MAXCMDLEN];
+    int total = snprintf(cmd, MAXCMDLEN, "-app %s ", app);
+    total += get_config(&host->config, cmd + total, MAXCMDLEN - total);
+    total += get_host_ip(host, cmd + total, MAXCMDLEN - total);
+
+    sendstr(sockfd, cmd, total + 1);
 
     return 0;
 }
@@ -199,8 +223,8 @@ hostname(int sockfd, char **str)
     u32 msg = htonl(MSG_HOSTNAME);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    *str = malloc(MAXHOSTLENGTH);
-    if (recstr(sockfd, *str, MAXHOSTLENGTH)) {
+    *str = malloc(MAXHOSTLEN);
+    if (recstr(sockfd, *str, MAXHOSTLEN)) {
         printf("rec hostname: %s\n", *str);
         rv = 1;
     }
@@ -208,30 +232,30 @@ hostname(int sockfd, char **str)
     return rv;
 }
 
-/* bool */
-/* send_config(int sockfd, host_config *config) */
-/* { */
-/*     int fps, bitrate, packetsize, width, height; */
-/*     bool rv = false; */
-/*     char *nsops, *localaudio; */
+int
+get_config(host_config *config, char *str, int size)
+{
+    int fps, bitrate, packetsize, rv = 0;
+    char *resolution, *nsops, *localaudio;
 
-/*     if (config) { */
-/*         fps = config->fps; */
-/*         bitrate = config->bitrate; */
-/*         packetsize = config->packetsize; */
-/*         width = config->width; */
-/*         height = config->height; */
-/*         nsops = config->nsops ? "-nsops" : ""; */
-/*         localaudio = config->localaudio ? "-localaudio" : ""; */
+    if (config && str) {
+        fps = config->fps;
+        bitrate = config->bitrate;
+        packetsize = config->packetsize;
+        resolution = (config->resolution == 720) ? "-720" : "-1080";
+        nsops = config->nsops ? "-nsops" : "";
+        localaudio = config->localaudio ? "-localaudio" : "";
 
-/*         char cmd[MAXCMD]; */
+        rv = snprintf(str, size, "-fps %d %s %s %s ", fps, resolution, nsops, localaudio);
+    }
 
-/*         snprintf(cmd, MAXCMD, "-fps %d -bitrate %d -packetsize %d %s %s", fps, bitrate, packetsize, nsops, localaudio); */
+    return rv;
+}
 
-/*         if (sendstr(sockfd, cmd, MAXCMD)) { */
-/*             rv = true; */
-/*         } */
-/*     } */
+int
+get_host_ip(host *host, char *str, int size)
+{
+    int rv = snprintf(str, size, "%s", host->ip);
 
-/*     return rv; */
-/* } */
+    return rv;
+}
