@@ -36,7 +36,7 @@ typedef struct host_config {
     int bitrate;
     int packetsize;
     int resolution;
-    int nsops;
+    int modify_settings;
     int localaudio;
 } host_config;
 
@@ -44,8 +44,8 @@ static const host_config default_config = {
     .fps = 60,
     .bitrate = 0,
     .packetsize = 0,
-    .resolution = 720,
-    .nsops = 0,
+    .resolution = 1080,
+    .modify_settings = 0,
     .localaudio = 0
 };
 
@@ -54,6 +54,7 @@ typedef struct host {
     char *ip;
     int is_paired;
     int servfd;
+    long config_offset;
     host_config config;
 } host;
 
@@ -62,12 +63,14 @@ typedef struct moonlight_server {
     struct sockaddr_in addr;
     char *name;
     int host_count;
+    long count_offset;
 } moonlight_server;
 
 static int
 sendstr(int sockfd, char *str, int size)
 {
-    int total = 0, numbytes = 0;
+    ssize_t numbytes = 0;
+    int total = 0;
 
     send(sockfd, &size, sizeof(size), 0);
 
@@ -86,7 +89,8 @@ sendstr(int sockfd, char *str, int size)
 static int
 recstr(int sockfd, char *str, int size)
 {
-    int total = 0, numbytes = 0, strlen;
+    ssize_t numbytes = 0, strlen;
+    int total = 0;
 
     recv(sockfd, &strlen, sizeof(strlen), 0);
 
