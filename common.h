@@ -66,13 +66,19 @@ typedef struct moonlight_server {
     long count_offset;
 } moonlight_server;
 
+typedef struct applist {
+    char **list;
+    u32 count;
+} applist;
+
 static int
 sendstr(int sockfd, char *str, int size)
 {
     ssize_t numbytes = 0;
-    int total = 0;
+    int total = 0, nsize;
 
-    send(sockfd, &size, sizeof(size), 0);
+    nsize = htonl(size);
+    send(sockfd, &nsize, sizeof(nsize), 0);
 
     while (total < size) {
         if ((numbytes = send(sockfd, str + total, size - total, 0)) == -1) {

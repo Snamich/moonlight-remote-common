@@ -19,7 +19,7 @@ int is_duplicate_host(host *hosts, int host_count, char *ip);
 
 int pair(int sockfd);
 int unpair(int sockfd);
-int list(int sockfd);
+int list(int sockfd, applist *alist);
 int launch(int sockfd, host *host, char *app);
 int quit(int sockfd);
 int hostname(int sockfd, char **str);

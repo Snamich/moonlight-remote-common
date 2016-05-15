@@ -119,6 +119,8 @@ load_host(host *host, FILE *fd)
         goto memory_cleanup_ip;
     }
 
+    // TODO: fix pairing
+    host->is_paired = 1;
     rv = 1;
     goto exit;
 
@@ -522,23 +524,52 @@ unpair(int sockfd)
 }
 
 int
-list(int sockfd)
+list(int sockfd, applist *alist)
 {
+    int rv = 0;
     u32 msg = htonl(MSG_LIST), nitems = 0;
     send(sockfd, &msg, sizeof(msg), 0);
 
+    // get the number of items
     if (recv(sockfd, &nitems, sizeof(nitems), 0) == -1) {
         perror("client recv msg_list");
+        goto exit;
     }
 
     nitems = ntohl(nitems);
+    char **list = malloc(nitems * sizeof(char *));
+    if (!list) {
+        goto exit;
+    }
 
-    return 0;
+    u32 i;
+    for (i = 0; i < nitems; ++i) {
+        if (!recstr(sockfd, &list[i])) {
+            printf("client (list): error receiving string\n");
+            goto list_cleanup;
+        }
+
+        printf("client (list) received line: %s\n", list[i]);
+    }
+
+    alist->list = list;
+    alist->count = nitems;
+    rv = 1;
+    goto exit;
+
+list_cleanup:
+    for (u32 j = 0; j < i; ++j) {
+        free(list[j]);
+    }
+    free(list);
+exit:
+    return rv;
 }
 
 int
 launch(int sockfd, host *host, char *app)
 {
+    printf("client - launching app: %s", app);
     u32 msg = htonl(MSG_LAUNCH);
     send(sockfd, &msg, sizeof(msg), 0);
 
