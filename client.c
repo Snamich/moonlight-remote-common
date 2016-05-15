@@ -568,8 +568,7 @@ hostname(int sockfd, char **str)
     u32 msg = htonl(MSG_HOSTNAME);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    *str = malloc(MAXHOSTLEN);
-    if (recstr(sockfd, *str, MAXHOSTLEN)) {
+    if (recstr(sockfd, str)) {
         printf("rec hostname: %s\n", *str);
         rv = 1;
     }

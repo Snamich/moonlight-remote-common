@@ -87,27 +87,42 @@ sendstr(int sockfd, char *str, int size)
 }
 
 static int
-recstr(int sockfd, char *str, int size)
+recstr(int sockfd, char **str)
 {
-    ssize_t numbytes = 0, strlen;
-    int total = 0;
+    ssize_t numbytes = 0;
+    int total = 0, rv = 0, size;
 
-    recv(sockfd, &strlen, sizeof(strlen), 0);
+    recv(sockfd, &size, sizeof(size), 0);
+    size = ntohl(size);
+    printf("recstr received string size: %d\n", size);
+
+    char *s = malloc(size);
+    if (!s) {
+        perror("recstr (malloc)");
+        goto exit;
+    }
 
     do {
-        numbytes = recv(sockfd, str, size - total, 0);
+        numbytes = recv(sockfd, s, size - total, 0);
 
         if (numbytes == -1) {
             perror("recstr");
-            return 0;
+            goto memory_cleanup;
         } else if (numbytes == 0) {
             break;
         }
 
         total += numbytes;
-    } while (total < size && total < strlen);
+    } while (total < size);
 
-    return total;
+    rv = total;
+    *str = s;
+    goto exit;
+
+memory_cleanup:
+    free(s);
+exit:
+    return rv;
 }
 
 #endif // COMMON_H
