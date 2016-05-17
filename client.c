@@ -22,16 +22,15 @@ hash_name(char *name)
 long
 save_host(host *host, FILE *fd)
 {
-    long config_offset, rv = 0;
-    size_t namelen, iplen;
+    long rv = 0;
 
     if (!host || !fd) {
         printf("error, NULL host or FILE passed to save_host\n");
         goto exit;
     }
 
-    namelen = strlen(host->name) + 1;
-    iplen = strlen(host->ip) + 1;
+    size_t namelen = strlen(host->name) + 1;
+    size_t iplen = strlen(host->ip) + 1;
 
     // write out the host name
     if (!fwrite(&namelen, sizeof(namelen), 1, fd)) {
@@ -56,7 +55,7 @@ save_host(host *host, FILE *fd)
     }
 
     // write out the host config
-    config_offset = ftell(fd);
+    long config_offset = ftell(fd);
     if (!fwrite(&host->config, sizeof(host->config), 1, fd)) {
         printf("error writing host config\n");
         goto exit;
@@ -72,7 +71,6 @@ int
 load_host(host *host, FILE *fd)
 {
     int rv = 0;
-    size_t namelen, iplen;
 
     if (!host || !fd) {
         printf("error, NULL host or FILE passed to load_host\n");
@@ -80,6 +78,7 @@ load_host(host *host, FILE *fd)
     }
 
     // read in the host name
+    size_t namelen;
     if (!fread(&namelen, sizeof(namelen), 1, fd))  {
         printf("error reading host name length\n");
     }
@@ -96,6 +95,7 @@ load_host(host *host, FILE *fd)
     }
 
     // read in the host ip address
+    size_t iplen;
     if (!fread(&iplen, sizeof(iplen), 1, fd)) {
         printf("error reading host ip length\n");
         goto memory_cleanup_name;
@@ -135,8 +135,7 @@ exit:
 long
 save_server(moonlight_server *server, char *path)
 {
-    long count_offset, rv = 0;
-    size_t namelen;
+    long rv = 0;
 
     if (!server || !path) {
         printf("error, NULL server or path passed to save_server\n");
@@ -149,6 +148,7 @@ save_server(moonlight_server *server, char *path)
     }
 
     // write the server name
+    size_t namelen;
     namelen = strlen(server->name) + 1;
     if (!fwrite(&namelen, sizeof(namelen), 1, savefd)) {
         printf("error writing server name length\n");
@@ -167,7 +167,7 @@ save_server(moonlight_server *server, char *path)
     }
 
     // write the server's hosts
-    count_offset = ftell(savefd);
+    long count_offset = ftell(savefd);
     if (!fwrite(&server->host_count, sizeof(server->host_count), 1,  savefd)) {
         printf("error writing server host count\n");
         goto file_delete;
@@ -192,12 +192,10 @@ exit:
     return rv;
 }
 
-int
+long
 load_server(moonlight_server *server, char *path)
 {
-    int rv = 0;
-    long count_offset;
-    size_t namelen;
+    long rv = 0;
 
     if (!server || !path) {
         printf("error, NULL server or path passed to load_server\n");
@@ -210,6 +208,7 @@ load_server(moonlight_server *server, char *path)
     }
 
     // read the server name
+    size_t namelen;
     if (!fread(&namelen, sizeof(namelen), 1, loadfd)) {
         int err = errno;
         //perror("load_server (fread)");
@@ -237,7 +236,7 @@ load_server(moonlight_server *server, char *path)
     }
 
     // read the server's hosts
-    count_offset = ftell(loadfd);
+    long count_offset = ftell(loadfd);
     if (!fread(&server->host_count, sizeof(server->host_count), 1, loadfd)) {
         printf("error reading server host count\n");
         goto memory_cleanup;
@@ -250,6 +249,7 @@ load_server(moonlight_server *server, char *path)
             goto memory_cleanup;
         }
 
+        h->server = server;
         printf("host %s loaded\n", h->name);
     }
 
@@ -267,10 +267,8 @@ exit:
 int
 update_host_config(host *host, char *path)
 {
-    FILE *savefd;
-
     if (path) {
-        savefd = fopen(path, "rb+");
+        FILE *savefd = fopen(path, "rb+");
         if (savefd) {
             fseek(savefd, host->config_offset, SEEK_SET);
             printf("update_host->config offset: %ld\n", host->config_offset);
@@ -291,10 +289,8 @@ update_host_config(host *host, char *path)
 int
 update_server_count(moonlight_server *server, char *path)
 {
-    FILE *savefd;
-
     if (path) {
-        savefd = fopen(path, "rb+");
+        FILE *savefd = fopen(path, "rb+");
         if (savefd) {
             fseek(savefd, server->count_offset, SEEK_SET);
             printf("update_server_count offset: %ld\n", server->count_offset);
@@ -329,18 +325,18 @@ broadcastfd_setup()
 }
 
 int
-servfd_setup(moonlight_server *server)
+tcp_client_setup(moonlight_server *server)
 {
     int servfd;
     struct sockaddr_in *server_addr = &server->addr;
     server_addr->sin_port = htons(atoi(LISTEN_PORT));
 
     if ((servfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
-        perror("client (servfd_setup socket)");
+        perror("client (tcp_client_setup socket)");
     }
 
     if (connect(servfd, server_addr, sizeof(*server_addr)) == -1) {
-        perror("client (servfd_setup connect)");
+        perror("client (tcp_client_setup connect)");
     }
 
     return servfd;
@@ -350,11 +346,9 @@ int
 discover(int sockfd, struct sockaddr_in *addr)
 {
     int rv = 0;
-    ssize_t numbytes;
-    socklen_t addr_len = sizeof(*addr);
-    struct hostent *host_entry;
 
     /* TODO: figure out address using subnet mask instead of spamming? */
+    struct hostent *host_entry;
     if ((host_entry = gethostbyname("255.255.255.255")) == NULL) {
         perror("server (broadcast gethostbyname)");
     }
@@ -369,6 +363,8 @@ discover(int sockfd, struct sockaddr_in *addr)
     struct timeval tv = { .tv_sec = 5, .tv_usec = 0 };
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval));
 
+    ssize_t numbytes;
+    socklen_t addr_len = sizeof(*addr);
     if ((numbytes = sendto(sockfd, &msg, sizeof(msg), 0, (struct sockaddr *)addr, addr_len)) == -1) {
         perror("client (broadcast sendto)");
     } else {
@@ -389,8 +385,9 @@ discover(int sockfd, struct sockaddr_in *addr)
 int
 is_duplicate_server(moonlight_server *servers, int server_count, struct sockaddr_in *addr)
 {
+    int rv = 0;
     if (!servers || !addr) {
-        return 0;
+        goto exit;
     }
 
     moonlight_server *s;
@@ -398,19 +395,18 @@ is_duplicate_server(moonlight_server *servers, int server_count, struct sockaddr
         // check server sockaddr_in
         s = servers + i;
         if (addr->sin_addr.s_addr == s->addr.sin_addr.s_addr) {
-            return 1;
+            rv = 1;
         }
     }
 
-    return 0;
+exit:
+    return rv;
 }
 
 char *
 get_server_name(struct sockaddr_in *addr)
 {
     int hostfd;
-    char *name;
-
     if ((hostfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
         perror("client (get_server_name socket)");
     }
@@ -419,6 +415,7 @@ get_server_name(struct sockaddr_in *addr)
         perror("client (get_server_name connect)");
     }
 
+    char *name;
     hostname(hostfd, &name);
 
     close(hostfd);
@@ -452,32 +449,32 @@ add_server(moonlight_server *server, struct sockaddr_in *addr, char *name, char 
 int
 is_duplicate_host(host *hosts, int host_count, char *ip)
 {
+    int rv = 0;
     if (!hosts || !ip) {
-        return 0;
+        goto exit;
     }
 
     host *h;
     for (int i = 0; i < host_count; ++i) {
         h = hosts + i;
         if (strcmp(h->ip, ip) == 0) {
-            return 1;
+            rv = 1;
         }
     }
 
-    return 0;
+exit:
+    return rv;
 }
 
 int
-add_host(host *host, char *name, char *ip, char *path)
+add_host(host *host, char *name, char *ip, moonlight_server *server, char *path)
 {
-    FILE *savefd;
-
     size_t namelen = strlen(name) + 1;
     size_t iplen = strlen(ip) + 1;
 
     host->name = malloc(namelen);
     host->ip = malloc(iplen);
-    host->servfd = -1;
+    host->server = server;
 
     memcpy(host->name, name, namelen);
     memcpy(host->ip, ip, iplen);
@@ -485,7 +482,7 @@ add_host(host *host, char *name, char *ip, char *path)
     memcpy(&host->config, &default_config, sizeof(default_config));
 
     if (path) {
-        savefd = fopen(path, "ab");
+        FILE *savefd = fopen(path, "ab");
         if (savefd) {
             printf("add_host beg file position: %ld of %s\n", ftell(savefd), path);
             host->config_offset = save_host(host, savefd);
@@ -500,46 +497,72 @@ add_host(host *host, char *name, char *ip, char *path)
 }
 
 int
-pair(int sockfd)
+pair(host *host)
 {
-    u32 pair_code = 0;
-    u32 msg = htonl(MSG_PAIR);
+    int rv = 0;
 
-    send(sockfd, &msg, sizeof(msg), 0);
-    if (recv(sockfd, &pair_code, sizeof(pair_code), 0) == -1) {
-        perror("client recv msg_pair");
+    int sockfd = tcp_client_setup(host->server);
+    if (sockfd < 0) {
+        goto exit;
     }
 
-    pair_code = ntohl(pair_code);
-    return pair_code;
+    u32 msg = htonl(MSG_PAIR);
+    send(sockfd, &msg, sizeof(msg), 0);
+
+    u32 pair_code = 0;
+    if (recv(sockfd, &pair_code, sizeof(pair_code), 0) == -1) {
+        perror("client recv msg_pair");
+        goto sock_close;
+    }
+
+    rv = ntohl(pair_code);
+
+sock_close:
+    close(sockfd);
+exit:
+    return rv;
 }
 
 int
-unpair(int sockfd)
+unpair(host *host)
 {
+    int sockfd = tcp_client_setup(host->server);
+    if (sockfd < 0) {
+        goto exit;
+    }
+
     u32 msg = htonl(MSG_UNPAIR);
     send(sockfd, &msg, sizeof(msg), 0);
 
+    close(sockfd);
+exit:
     return 0;
 }
 
 int
-list(int sockfd, applist *alist)
+list(host *host, applist *alist)
 {
     int rv = 0;
-    u32 msg = htonl(MSG_LIST), nitems = 0;
+
+    int sockfd = tcp_client_setup(host->server);
+    if (sockfd < 0) {
+        goto exit;
+    }
+
+    u32 msg = htonl(MSG_LIST);
     send(sockfd, &msg, sizeof(msg), 0);
 
     // get the number of items
+    int nitems;
     if (recv(sockfd, &nitems, sizeof(nitems), 0) == -1) {
         perror("client recv msg_list");
-        goto exit;
+        goto sock_close;
     }
 
     nitems = ntohl(nitems);
     char **list = malloc(nitems * sizeof(char *));
     if (!list) {
-        goto exit;
+        goto sock_close;
     }
 
     u32 i;
@@ -555,20 +578,27 @@ list(int sockfd, applist *alist)
     alist->list = list;
     alist->count = nitems;
     rv = 1;
-    goto exit;
+    goto sock_close;
 
 list_cleanup:
     for (u32 j = 0; j < i; ++j) {
         free(list[j]);
     }
     free(list);
+sock_close:
+    close(sockfd);
 exit:
     return rv;
 }
 
 int
-launch(int sockfd, host *host, char *app)
+launch(host *host, char *app)
 {
+    int sockfd = tcp_client_setup(host->server);
+    if (sockfd < 0) {
+        goto exit;
+    }
+
     printf("client - launching app: %s", app);
     u32 msg = htonl(MSG_LAUNCH);
     send(sockfd, &msg, sizeof(msg), 0);
@@ -580,15 +610,26 @@ launch(int sockfd, host *host, char *app)
 
     sendstr(sockfd, cmd, total + 1);
 
-    return 0;
+sock_close:
+    close(sockfd);
+exit:
+    return 1;
 }
 
 int
-quit(int sockfd)
+quit(host *host)
 {
+    int sockfd = tcp_client_setup(host->server);
+    if (sockfd < 0) {
+        goto exit;
+    }
+
     u32 msg = htonl(MSG_QUIT);
     send(sockfd, &msg, sizeof(msg), 0);
 
+    close(sockfd);
+
+exit:
     return 0;
 }
 
@@ -596,6 +637,7 @@ int
 hostname(int sockfd, char **str)
 {
     int rv = 0;
+
     u32 msg = htonl(MSG_HOSTNAME);
     send(sockfd, &msg, sizeof(msg), 0);
 
@@ -604,6 +646,9 @@ hostname(int sockfd, char **str)
         rv = 1;
     }
 
+    close(sockfd);
+
+exit:
     return rv;
 }
 
@@ -633,4 +678,15 @@ get_host_ip(host *host, char *str, int size)
     int rv = snprintf(str, size, "%s", host->ip);
 
     return rv;
+}
+
+int
+free_applist(applist *alist)
+{
+    for (int i = 0; i < alist->count; ++i) {
+        free(alist->list[i]);
+    }
+
+    free(alist->list);
+    return 1;
 }

@@ -53,8 +53,8 @@ typedef struct host {
     char *name;
     char *ip;
     int is_paired;
-    int servfd;
     long config_offset;
+    struct moonlight_server *server;
     host_config config;
 } host;
 
