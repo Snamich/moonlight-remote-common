@@ -3,22 +3,6 @@
 
 #include <errno.h>
 
-int
-hash_name(char *name)
-{
-    int hash = 0;
-
-    if (!name) {
-        return 0;
-    }
-
-    for(int i = 0; name[i] != '\0'; ++i) {
-        hash += name[i] * (i + 1);
-    }
-
-    return hash;
-}
-
 long
 save_host(host *host, FILE *fd)
 {
@@ -423,6 +407,25 @@ get_server_name(struct sockaddr_in *addr)
     return name;
 }
 
+char *
+get_server_file(moonlight_server *server)
+{
+    char *file = NULL;
+
+    size_t namelen = strlen(server->name);
+
+    char *ip = inet_ntoa(server->addr.sin_addr);
+    size_t iplen = strlen(ip);
+
+    size_t filelen = namelen + iplen + 2;
+    file = malloc(filelen);
+    if (file) {
+        snprintf(file, filelen, "%s-%s", server->name, ip);
+    }
+
+    return file;
+}
+
 int
 add_server(moonlight_server *server, struct sockaddr_in *addr, char *name, char *path)
 {
@@ -434,7 +437,7 @@ add_server(moonlight_server *server, struct sockaddr_in *addr, char *name, char 
         printf("server host count: %d\n", server->host_count);
     } else {
         // file doesn't exist
-        printf("server file not found, creating one\n");
+        printf("server file not found, creating one at: %s\n", path);
         struct sockaddr_in *server_addr = &server->addr;
         memcpy(server_addr, addr, sizeof(*server_addr));
 
