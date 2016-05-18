@@ -67,11 +67,12 @@ typedef struct moonlight_server {
 } moonlight_server;
 
 static int
-sendstr(int sockfd, char *str, int size)
+sendstr(int sockfd, char *str)
 {
     ssize_t numbytes = 0;
     int total = 0, nsize;
 
+    size_t size = strlen(str) + 1;
     nsize = htonl(size);
     send(sockfd, &nsize, sizeof(nsize), 0);
 

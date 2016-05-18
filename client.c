@@ -638,7 +638,7 @@ launch(host *host, char *game)
     total += get_config(&host->config, cmd + total, MAXCMDLEN - total);
     total += get_host_ip(host, cmd + total, MAXCMDLEN - total);
 
-    sendstr(sockfd, cmd, total + 1);
+    sendstr(sockfd, cmd);
 
 sock_close:
     close(sockfd);
