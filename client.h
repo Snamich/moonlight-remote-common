@@ -28,5 +28,6 @@ int get_config(host_config *config, char *cfg, int size);
 int get_host_ip(host *host, char *str, int size);
 char *get_server_file(moonlight_server *server);
 char *get_server_name(struct sockaddr_in *addr);
+int free_applist(applist *alist);
 
 #endif // CLIENT_H

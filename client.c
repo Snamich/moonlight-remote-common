@@ -578,6 +578,10 @@ list(host *host, applist *alist)
         printf("client (list) received line: %s\n", list[i]);
     }
 
+    if (alist) {
+        free_applist(alist);
+    }
+
     alist->list = list;
     alist->count = nitems;
     rv = 1;
