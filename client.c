@@ -3,6 +3,26 @@
 
 #include <errno.h>
 
+static int
+game_cmp(const void *a, const void *b)
+{
+    const char *g1 = *(const char **)a;
+    const char *g2 = *(const char **)b;
+
+    // don't include "The" in comparison
+    if (g1 && g2) {
+        if (strncmp(g1, "The", 3) == 0) {
+            g1 += 4;
+        }
+
+        if (strncmp(g2, "The", 3) == 0) {
+            g2 += 4;
+        }
+    }
+
+    return strcmp(g1, g2);
+}
+
 long
 save_host(host *host, FILE *fd)
 {
@@ -584,6 +604,9 @@ list(host *host, gamelist *glist)
 
     glist->list = list;
     glist->count = nitems;
+
+    qsort(glist->list, glist->count, sizeof(*glist->list), game_cmp);
+
     rv = 1;
     goto sock_close;
 
