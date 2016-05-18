@@ -66,11 +66,6 @@ typedef struct moonlight_server {
     long count_offset;
 } moonlight_server;
 
-typedef struct applist {
-    char **list;
-    u32 count;
-} applist;
-
 static int
 sendstr(int sockfd, char *str, int size)
 {

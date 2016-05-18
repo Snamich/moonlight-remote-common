@@ -1,6 +1,11 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
+typedef struct gamelist {
+    char **list;
+    u32 count;
+} gamelist;
+
 int broadcastfd_setup();
 int discover(int sockfd, struct sockaddr_in *addr);
 int tcp_client_setup(moonlight_server *server);
@@ -19,7 +24,7 @@ int is_duplicate_host(host *hosts, int host_count, char *ip);
 
 int pair(host *host);
 int unpair(host *host);
-int list(host *host, applist *alist);
+int list(host *host, gamelist *glist);
 int launch(host *host, char *app);
 int quit(host *host);
 int hostname(int sockfd, char **str);
@@ -28,6 +33,6 @@ int get_config(host_config *config, char *cfg, int size);
 int get_host_ip(host *host, char *str, int size);
 char *get_server_file(moonlight_server *server);
 char *get_server_name(struct sockaddr_in *addr);
-int free_applist(applist *alist);
+int free_gamelist(gamelist *glist);
 
 #endif // CLIENT_H

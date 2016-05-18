@@ -543,7 +543,7 @@ exit:
 }
 
 int
-list(host *host, applist *alist)
+list(host *host, gamelist *glist)
 {
     int rv = 0;
 
@@ -578,12 +578,12 @@ list(host *host, applist *alist)
         printf("client (list) received line: %s\n", list[i]);
     }
 
-    if (alist) {
-        free_applist(alist);
+    if (glist) {
+        free_gamelist(glist);
     }
 
-    alist->list = list;
-    alist->count = nitems;
+    glist->list = list;
+    glist->count = nitems;
     rv = 1;
     goto sock_close;
 
@@ -599,19 +599,19 @@ exit:
 }
 
 int
-launch(host *host, char *app)
+launch(host *host, char *game)
 {
     int sockfd = tcp_client_setup(host->server);
     if (sockfd < 0) {
         goto exit;
     }
 
-    printf("client - launching app: %s", app);
+    printf("client - launching game: %s", game);
     u32 msg = htonl(MSG_LAUNCH);
     send(sockfd, &msg, sizeof(msg), 0);
 
     char cmd[MAXCMDLEN];
-    int total = snprintf(cmd, MAXCMDLEN, "-app %s ", app);
+    int total = snprintf(cmd, MAXCMDLEN, "-app %s ", game);
     total += get_config(&host->config, cmd + total, MAXCMDLEN - total);
     total += get_host_ip(host, cmd + total, MAXCMDLEN - total);
 
@@ -688,12 +688,12 @@ get_host_ip(host *host, char *str, int size)
 }
 
 int
-free_applist(applist *alist)
+free_gamelist(gamelist *glist)
 {
-    for (int i = 0; i < alist->count; ++i) {
-        free(alist->list[i]);
+    for (int i = 0; i < glist->count; ++i) {
+        free(glist->list[i]);
     }
 
-    free(alist->list);
+    free(glist->list);
     return 1;
 }
