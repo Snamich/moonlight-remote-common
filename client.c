@@ -634,7 +634,7 @@ launch(host *host, char *game)
     send(sockfd, &msg, sizeof(msg), 0);
 
     char cmd[MAXCMDLEN];
-    int total = snprintf(cmd, MAXCMDLEN, "-app %s ", game);
+    int total = snprintf(cmd, MAXCMDLEN, "-app \"%s\" ", game);
     total += get_config(&host->config, cmd + total, MAXCMDLEN - total);
     total += get_host_ip(host, cmd + total, MAXCMDLEN - total);
 
