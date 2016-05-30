@@ -22,7 +22,9 @@ int add_host(host *host, char *name, char *ip, moonlight_server *server, char *p
 int update_host_config(host *host, char *path);
 int is_duplicate_host(host *hosts, int host_count, char *ip);
 
-int pair(host *host);
+int pair(host *host, int *pair_code);
+int pair_cancel(int sockfd);
+int pair_response(int sockfd);
 int unpair(host *host);
 int list(host *host, gamelist *glist);
 int launch(host *host, char *app);

@@ -377,6 +377,7 @@ discover(int sockfd, struct sockaddr_in *addr)
         } else {
             msg = ntohl(msg);
             if (msg == MSG_HANDSHAKE) {
+                printf("client (discover): received handshake\n");
                 rv = 1;
                 addr->sin_port = htons(atoi(LISTEN_PORT));
             }
@@ -520,7 +521,7 @@ add_host(host *host, char *name, char *ip, moonlight_server *server, char *path)
 }
 
 int
-pair(host *host)
+pair(host *host, int *pair_code)
 {
     int rv = 0;
 
@@ -532,13 +533,63 @@ pair(host *host)
     u32 msg = htonl(MSG_PAIR);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    u32 pair_code = 0;
-    if (recv(sockfd, &pair_code, sizeof(pair_code), 0) == -1) {
+    sendstr(sockfd, host->ip);
+
+    if (recv(sockfd, pair_code, sizeof(*pair_code), 0) == -1) {
         perror("client recv msg_pair");
         goto sock_close;
     }
 
-    rv = ntohl(pair_code);
+    *pair_code = ntohl(*pair_code);
+    rv = sockfd;
+    goto exit;
+
+sock_close:
+    close(sockfd);
+exit:
+    return rv;
+}
+
+// TODO: implement this
+int
+pair_cancel(int sockfd)
+{
+    int rv = 0;
+
+    if (sockfd < 0) {
+        goto exit;
+    }
+
+    u32 msg = htonl(MSG_OK);
+    if (send(sockfd, &msg, sizeof(msg), 0) == -1) {
+        perror("client send pair_cancel");
+        goto sock_close;
+    }
+
+    rv = 1;
+
+sock_close:
+    close(sockfd);
+exit:
+    return rv;
+}
+
+int
+pair_response(int sockfd)
+{
+    int rv = 0;
+
+    if (sockfd < 0) {
+        goto exit;
+    }
+
+    u32 msg;
+    if (recv(sockfd, &msg, sizeof(msg), 0) == -1) {
+        perror("client recv pair_response");
+        goto sock_close;
+    }
+
+    rv = ntohl(msg) == MSG_OK ? 1 : 0;
 
 sock_close:
     close(sockfd);
@@ -549,6 +600,8 @@ exit:
 int
 unpair(host *host)
 {
+    int rv = 0;
+
     int sockfd = tcp_client_setup(host->server);
     if (sockfd < 0) {
         goto exit;
@@ -557,9 +610,16 @@ unpair(host *host)
     u32 msg = htonl(MSG_UNPAIR);
     send(sockfd, &msg, sizeof(msg), 0);
 
+    sendstr(sockfd, host->ip);
+
+    recv(sockfd, &msg, sizeof(msg), 0);
+    if (ntohl(msg) == MSG_OK) {
+        rv = 1;
+    }
+
     close(sockfd);
 exit:
-    return 0;
+    return rv;
 }
 
 int
@@ -574,6 +634,12 @@ list(host *host, gamelist *glist)
 
     u32 msg = htonl(MSG_LIST);
     send(sockfd, &msg, sizeof(msg), 0);
+
+    // check if there's a new list to receive
+    recv(sockfd, &msg, sizeof(msg), 0);
+    if (ntohl(msg) == MSG_NO) {
+        goto sock_close;
+    }
 
     // get the number of items
     int nitems;
@@ -624,6 +690,8 @@ exit:
 int
 launch(host *host, char *game)
 {
+    int rv = 0;
+
     int sockfd = tcp_client_setup(host->server);
     if (sockfd < 0) {
         goto exit;
@@ -640,15 +708,22 @@ launch(host *host, char *game)
 
     sendstr(sockfd, cmd);
 
+    recv(sockfd, &msg, sizeof(msg), 0);
+    if (ntohl(msg) == MSG_OK) {
+        rv = 1;
+    }
+
 sock_close:
     close(sockfd);
 exit:
-    return 1;
+    return rv;
 }
 
 int
 quit(host *host)
 {
+    int rv = 0;
+
     int sockfd = tcp_client_setup(host->server);
     if (sockfd < 0) {
         goto exit;
@@ -657,10 +732,17 @@ quit(host *host)
     u32 msg = htonl(MSG_QUIT);
     send(sockfd, &msg, sizeof(msg), 0);
 
+    sendstr(sockfd, host->ip);
+
+    recv(sockfd, &msg, sizeof(msg), 0);
+    if (ntohl(msg) == MSG_OK) {
+        rv = 1;
+    }
+
     close(sockfd);
 
 exit:
-    return 0;
+    return rv;
 }
 
 int
@@ -675,8 +757,6 @@ hostname(int sockfd, char **str)
         printf("rec hostname: %s\n", *str);
         rv = 1;
     }
-
-    close(sockfd);
 
 exit:
     return rv;
