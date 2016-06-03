@@ -30,34 +30,47 @@
 #define MSG_NO        0x000000010
 #define MSG_OK        0x000000011
 
+#define CFG_FPS              0x0001
+#define CFG_RESOLUTION       0x0002
+#define CFG_MODIFY_SETTINGS  0x0004
+#define CFG_LOCAL_AUDIO      0x0008
+
+#define CFG_SHIFT                 4
+
+#define DEFAULT_CONFIG ((u32)(CFG_FPS | CFG_RESOLUTION))
+
 #define MAXHOSTLEN 100
 #define MAXCMDLEN 200
 
-typedef struct host_config {
-    int fps;
-    int bitrate;
-    int packetsize;
-    int resolution;
-    int modify_settings;
-    int localaudio;
-} host_config;
+static int
+set_config_opt(u32 *config, u32 options, u32 value)
+{
+    u32 rv = 0;
 
-static const host_config default_config = {
-    .fps = 60,
-    .bitrate = 0,
-    .packetsize = 0,
-    .resolution = 1080,
-    .modify_settings = 0,
-    .localaudio = 0
-};
+    if (config) {
+        if (value) {
+            rv = *config | options;
+        } else {
+            rv = *config & ~options;
+        }
+    }
+
+    return rv;
+}
+
+static int
+get_config_opt(u32 config, u32 options)
+{
+    return config & options;
+}
 
 typedef struct host {
     char *name;
     char *ip;
     int is_paired;
+    u32 config;
     long config_offset;
     struct moonlight_server *server;
-    host_config config;
 } host;
 
 typedef struct moonlight_server {

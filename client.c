@@ -503,7 +503,7 @@ add_host(host *host, char *name, char *ip, moonlight_server *server, char *path)
     memcpy(host->name, name, namelen);
     memcpy(host->ip, ip, iplen);
     host->is_paired = 1;
-    memcpy(&host->config, &default_config, sizeof(default_config));
+    host->config = DEFAULT_CONFIG;
 
     if (path) {
         FILE *savefd = fopen(path, "ab");
@@ -698,15 +698,18 @@ launch(host *host, char *game)
     }
 
     printf("client - launching game: %s", game);
-    u32 msg = htonl(MSG_LAUNCH);
+    u32 msg = htonl(MSG_LAUNCH | host->config << CFG_SHIFT);
     send(sockfd, &msg, sizeof(msg), 0);
 
     char cmd[MAXCMDLEN];
-    int total = snprintf(cmd, MAXCMDLEN, "-app \"%s\" ", game);
-    total += get_config(&host->config, cmd + total, MAXCMDLEN - total);
-    total += get_host_ip(host, cmd + total, MAXCMDLEN - total);
+    snprintf(cmd, MAXCMDLEN, "-app \"%s\" ", game);
 
-    sendstr(sockfd, cmd);
+    sendstr(sockfd, game);
+
+    char ip[MAXCMDLEN];
+    get_host_ip(host, ip, MAXCMDLEN);
+
+    sendstr(sockfd, ip);
 
     recv(sockfd, &msg, sizeof(msg), 0);
     if (ntohl(msg) == MSG_OK) {
@@ -759,26 +762,6 @@ hostname(int sockfd, char **str)
     }
 
 exit:
-    return rv;
-}
-
-int
-get_config(host_config *config, char *str, int size)
-{
-    int fps, bitrate, packetsize, rv = 0;
-    char *resolution, *modify_settings, *localaudio;
-
-    if (config && str) {
-        fps = config->fps;
-        bitrate = config->bitrate;
-        packetsize = config->packetsize;
-        resolution = (config->resolution == 720) ? "-720" : "-1080";
-        modify_settings = config->modify_settings ? "-nsops" : "";
-        localaudio = config->localaudio ? "-localaudio" : "";
-
-        rv = snprintf(str, size, "-fps %d %s %s %s ", fps, resolution, modify_settings, localaudio);
-    }
-
     return rv;
 }
 

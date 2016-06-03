@@ -123,6 +123,24 @@ discover(int sockfd)
 }
 
 int
+get_config_str(u32 config, char *str, int size)
+{
+    int fps, rv = 0;
+    char *resolution, *modify_settings, *localaudio;
+
+    if (str && 0 < size) {
+        fps = get_config_opt(config, CFG_FPS) ? 60 : 30;
+        resolution = get_config_opt(config, CFG_RESOLUTION) ? "-1080" : "-720";
+        modify_settings = get_config_opt(config, CFG_MODIFY_SETTINGS) ? "-nsops" : "";
+        localaudio = get_config_opt(config, CFG_LOCAL_AUDIO) ? "-localaudio" : "";
+
+        rv = snprintf(str, size, "-fps %d %s %s %s ", fps, resolution, modify_settings, localaudio);
+    }
+
+    return rv;
+}
+
+int
 main(int argc, char **argv)
 {
     pid_t child_pid;
@@ -140,7 +158,7 @@ main(int argc, char **argv)
         /* parent */
         bool host_running = false;
         int listenfd = listenfd_setup();
-        uint msg = 0;
+        uint msg_packed = 0, msg = 0;
 
         struct sockaddr_storage their_addr;
         socklen_t addr_size = sizeof(their_addr);
@@ -148,17 +166,19 @@ main(int argc, char **argv)
         while (1) {
             // get msg, only handles one client for now
             int connfd = accept(listenfd, (struct sockaddr *)&their_addr, &addr_size);
-            if (recv(connfd, &msg, sizeof(msg), 0) == -1) {
+            if (recv(connfd, &msg_packed, sizeof(msg_packed), 0) == -1) {
                 perror("server (recv msg)");
                 continue;
             }
 
-            msg = ntohl(msg);
+            msg_packed = ntohl(msg_packed);
+            msg = msg_packed & 0x000F;
             printf("server received msg %x from client\n", msg);
 
             switch (msg) {
                 case MSG_LIST:
                 {
+                    u32 msg;
                     /* FILE *fd = popen("moonlight list 192.168.0.182", "r"); */
                     /* if (!fd) { */
                     /*     perror("server (popen)"); */
@@ -338,22 +358,32 @@ main(int argc, char **argv)
                 case MSG_LAUNCH:
                 {
                     /* run moonlight stream -app <game> <config> <host> */
+                    u32 msg;
+
                     if (!host_running) {
+                        u32 config = (msg_packed >> CFG_SHIFT) & 0x000F;
+
                         char cmd[MAXCMDLEN];
                         int total = snprintf(cmd, MAXCMDLEN, "moonlight stream ");
                         printf("server cmd: %s\n", cmd);
 
                         char *game;
                         int game_size = recstr(connfd, &game);
-                        total += snprintf(cmd + total, MAXCMDLEN, "%s", game);
+                        total += snprintf(cmd + total, MAXCMDLEN, "-app %s ", game);
+
+                        total += get_config_str(config, cmd + total, MAXCMDLEN - total);
+
+                        char *ip;
+                        int ip_size = recstr(connfd, &ip);
+                        total += snprintf(cmd + total, MAXCMDLEN, "%s", ip);
                         printf("server cmd: %s\n", cmd);
 
                         host_running = !system(cmd);
-                        u32 msg = host_running ? htonl(MSG_OK) : htonl(MSG_NO);
+                        msg = host_running ? htonl(MSG_OK) : htonl(MSG_NO);
                         send(connfd, &msg, sizeof(msg), 0);
 
                         free(game);
-
+                        free(ip);
                     } else {
 
                     }
