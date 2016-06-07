@@ -533,10 +533,17 @@ pair(host *host, int *pair_code)
     u32 msg = htonl(MSG_PAIR);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    sendstr(sockfd, host->ip);
+    char ip[MAXCMDLEN];
+    get_host_ip(host, ip, MAXCMDLEN);
+    sendstr(sockfd, ip);
 
-    if (recv(sockfd, pair_code, sizeof(*pair_code), 0) == -1) {
-        perror("client recv msg_pair");
+    recv(sockfd, &msg, sizeof(msg), 0);
+    if (ntohl(msg) == MSG_OK) {
+        if (recv(sockfd, pair_code, sizeof(*pair_code), 0) == -1) {
+            perror("client recv msg_pair");
+            goto sock_close;
+        }
+    } else {
         goto sock_close;
     }
 
@@ -610,14 +617,20 @@ unpair(host *host)
     u32 msg = htonl(MSG_UNPAIR);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    sendstr(sockfd, host->ip);
+    char ip[MAXCMDLEN];
+    get_host_ip(host, ip, MAXCMDLEN);
+    sendstr(sockfd, ip);
 
     recv(sockfd, &msg, sizeof(msg), 0);
     if (ntohl(msg) == MSG_OK) {
-        rv = 1;
+        recv(sockfd, &msg, sizeof(msg), 0);
+        if (ntohl(msg) == MSG_OK) {
+            rv = 1;
+        }
     }
 
     close(sockfd);
+
 exit:
     return rv;
 }
@@ -635,46 +648,56 @@ list(host *host, gamelist *glist)
     u32 msg = htonl(MSG_LIST);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    // check if there's a new list to receive
-    recv(sockfd, &msg, sizeof(msg), 0);
-    if (ntohl(msg) == MSG_NO) {
-        goto sock_close;
-    }
+    char ip[MAXCMDLEN];
+    get_host_ip(host, ip, MAXCMDLEN);
+    sendstr(sockfd, ip);
 
-    // get the number of items
-    int nitems;
-    if (recv(sockfd, &nitems, sizeof(nitems), 0) == -1) {
-        perror("client recv msg_list");
-        goto sock_close;
-    }
-
-    nitems = ntohl(nitems);
-    char **list = malloc(nitems * sizeof(char *));
-    if (!list) {
-        goto sock_close;
-    }
-
+    char **list;
     u32 i;
-    for (i = 0; i < nitems; ++i) {
-        if (!recstr(sockfd, &list[i])) {
-            printf("client (list): error receiving string\n");
-            goto list_cleanup;
+    recv(sockfd, &msg, sizeof(msg), 0);
+    if (ntohl(msg) == MSG_OK) {
+        // check if there's a new list to receive
+        recv(sockfd, &msg, sizeof(msg), 0);
+        if (ntohl(msg) == MSG_NO) {
+            goto sock_close;
         }
 
-        printf("client (list) received line: %s\n", list[i]);
+        // get the number of items
+        u32 nitems;
+        if (recv(sockfd, &nitems, sizeof(nitems), 0) == -1) {
+            perror("client recv msg_list");
+            goto sock_close;
+        }
+
+        nitems = ntohl(nitems);
+        list = malloc(nitems * sizeof(char *));
+        if (!list) {
+            goto sock_close;
+        }
+
+        for (i = 0; i < nitems; ++i) {
+            if (!recstr(sockfd, &list[i])) {
+                printf("client (list): error receiving string\n");
+                goto list_cleanup;
+            }
+
+            printf("client (list) received line: %s\n", list[i]);
+        }
+
+        if (glist) {
+            free_gamelist(glist);
+        }
+
+        glist->list = list;
+        glist->count = nitems;
+
+        qsort(glist->list, glist->count, sizeof(*glist->list), game_cmp);
+
+        rv = 1;
+        goto sock_close;
+    } else {
+        goto sock_close;
     }
-
-    if (glist) {
-        free_gamelist(glist);
-    }
-
-    glist->list = list;
-    glist->count = nitems;
-
-    qsort(glist->list, glist->count, sizeof(*glist->list), game_cmp);
-
-    rv = 1;
-    goto sock_close;
 
 list_cleanup:
     for (u32 j = 0; j < i; ++j) {
@@ -703,21 +726,22 @@ launch(host *host, char *game)
 
     char cmd[MAXCMDLEN];
     snprintf(cmd, MAXCMDLEN, "-app \"%s\" ", game);
-
     sendstr(sockfd, game);
 
     char ip[MAXCMDLEN];
     get_host_ip(host, ip, MAXCMDLEN);
-
     sendstr(sockfd, ip);
 
     recv(sockfd, &msg, sizeof(msg), 0);
     if (ntohl(msg) == MSG_OK) {
-        rv = 1;
+        recv(sockfd, &msg, sizeof(msg), 0);
+        if (ntohl(msg) == MSG_OK) {
+            rv = 1;
+        }
     }
 
-sock_close:
     close(sockfd);
+
 exit:
     return rv;
 }
@@ -735,11 +759,16 @@ quit(host *host)
     u32 msg = htonl(MSG_QUIT);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    sendstr(sockfd, host->ip);
+    char ip[MAXCMDLEN];
+    get_host_ip(host, ip, MAXCMDLEN);
+    sendstr(sockfd, ip);
 
     recv(sockfd, &msg, sizeof(msg), 0);
     if (ntohl(msg) == MSG_OK) {
-        rv = 1;
+        recv(sockfd, &msg, sizeof(msg), 0);
+        if (ntohl(msg) == MSG_OK) {
+            rv = 1;
+        }
     }
 
     close(sockfd);
@@ -761,7 +790,6 @@ hostname(int sockfd, char **str)
         rv = 1;
     }
 
-exit:
     return rv;
 }
 
@@ -776,7 +804,7 @@ get_host_ip(host *host, char *str, int size)
 int
 free_gamelist(gamelist *glist)
 {
-    for (int i = 0; i < glist->count; ++i) {
+    for (u32 i = 0; i < glist->count; ++i) {
         free(glist->list[i]);
     }
 

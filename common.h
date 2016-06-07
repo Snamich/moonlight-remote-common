@@ -142,4 +142,13 @@ exit:
     return rv;
 }
 
+static int
+is_valid_ip(char *ip)
+{
+    struct sockaddr_in sa;
+    int rv = inet_pton(AF_INET, ip, &(sa.sin_addr));
+
+    return rv != 0;
+}
+
 #endif // COMMON_H
