@@ -40,7 +40,8 @@
 #define DEFAULT_CONFIG ((u32)(CFG_FPS | CFG_RESOLUTION))
 
 #define MAXHOSTLEN 100
-#define MAXCMDLEN 200
+#define MAXCMDLEN  200
+#define MAXIPLEN    20
 
 static int
 set_config_opt(u32 *config, u32 options, u32 value)

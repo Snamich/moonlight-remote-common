@@ -533,8 +533,8 @@ pair(host *host, int *pair_code)
     u32 msg = htonl(MSG_PAIR);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    char ip[MAXCMDLEN];
-    get_host_ip(host, ip, MAXCMDLEN);
+    char ip[MAXIPLEN];
+    get_host_ip(host, ip);
     sendstr(sockfd, ip);
 
     recv(sockfd, &msg, sizeof(msg), 0);
@@ -617,8 +617,8 @@ unpair(host *host)
     u32 msg = htonl(MSG_UNPAIR);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    char ip[MAXCMDLEN];
-    get_host_ip(host, ip, MAXCMDLEN);
+    char ip[MAXIPLEN];
+    get_host_ip(host, ip);
     sendstr(sockfd, ip);
 
     recv(sockfd, &msg, sizeof(msg), 0);
@@ -648,8 +648,8 @@ list(host *host, gamelist *glist)
     u32 msg = htonl(MSG_LIST);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    char ip[MAXCMDLEN];
-    get_host_ip(host, ip, MAXCMDLEN);
+    char ip[MAXIPLEN];
+    get_host_ip(host, ip);
     sendstr(sockfd, ip);
 
     char **list;
@@ -728,8 +728,8 @@ launch(host *host, char *game)
     snprintf(cmd, MAXCMDLEN, "-app \"%s\" ", game);
     sendstr(sockfd, game);
 
-    char ip[MAXCMDLEN];
-    get_host_ip(host, ip, MAXCMDLEN);
+    char ip[MAXIPLEN];
+    get_host_ip(host, ip);
     sendstr(sockfd, ip);
 
     recv(sockfd, &msg, sizeof(msg), 0);
@@ -759,8 +759,8 @@ quit(host *host)
     u32 msg = htonl(MSG_QUIT);
     send(sockfd, &msg, sizeof(msg), 0);
 
-    char ip[MAXCMDLEN];
-    get_host_ip(host, ip, MAXCMDLEN);
+    char ip[MAXIPLEN];
+    get_host_ip(host, ip);
     sendstr(sockfd, ip);
 
     recv(sockfd, &msg, sizeof(msg), 0);
@@ -794,9 +794,9 @@ hostname(int sockfd, char **str)
 }
 
 int
-get_host_ip(host *host, char *str, int size)
+get_host_ip(host *host, char *str)
 {
-    int rv = snprintf(str, size, "%s", host->ip);
+    int rv = snprintf(str, MAXIPLEN, "%s", host->ip);
 
     return rv;
 }

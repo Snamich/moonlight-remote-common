@@ -31,7 +31,7 @@ int launch(host *host, char *app);
 int quit(host *host);
 int hostname(int sockfd, char **str);
 
-int get_host_ip(host *host, char *str, int size);
+int get_host_ip(host *host, char *str);
 char *get_server_file(moonlight_server *server);
 char *get_server_name(struct sockaddr_in *addr);
 int free_gamelist(gamelist *glist);
