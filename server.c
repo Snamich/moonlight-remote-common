@@ -156,7 +156,7 @@ main(int argc, char **argv)
         discover(broadcastfd);
     } else {
         /* parent */
-        bool host_running = false;
+        int host_running = 0;
         int listenfd = listenfd_setup();
         uint msg_packed = 0, msg = 0;
 
@@ -189,8 +189,8 @@ main(int argc, char **argv)
                         char cmd[MAXCMDLEN];
                         snprintf(cmd, MAXCMDLEN, "moonlight list %s", ip);
 
-                        FILE *fd = popen(cmd, "r");
-                        if (!fd) {
+                        FILE *pd = popen(cmd, "r");
+                        if (!pd) {
                             perror("server (popen)");
                             // send back some kind of error response
                             continue;
@@ -210,7 +210,7 @@ main(int argc, char **argv)
                         size_t linelen = 0, maxline = 0;
                         char *line = NULL;
                         fseek(listfd, sizeof(linelen) * 2, SEEK_SET);
-                        while ((linelen = getline(&line, &linelen, fd)) != -1) {
+                        while ((linelen = getline(&line, &linelen, pd)) != -1) {
                             // skip the line if it doesn't start with a number
                             if (!isdigit(line[0])) {
                                 continue;
@@ -237,7 +237,7 @@ main(int argc, char **argv)
                         fseek(listfd, 0, SEEK_SET);
                         fwrite(&nlines, sizeof(nlines), 1, listfd);
                         free(line);
-                        pclose(fd);
+                        pclose(pd);
 
                         // send the list
                         // TODO: compress this into the reading
@@ -460,7 +460,6 @@ main(int argc, char **argv)
                     if (gethostname(hostname, MAXHOSTLEN) == -1) {
                         perror("server (gethostname)");
                     } else {
-                        int hostlen = strnlen(hostname, MAXHOSTLEN);
                         sendstr(connfd, hostname);
                     }
                 } break;
