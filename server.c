@@ -179,12 +179,6 @@ main(int argc, char **argv)
                 case MSG_LIST:
                 {
                     u32 msg;
-                    /* FILE *fd = popen("moonlight list 192.168.0.182", "r"); */
-                    /* if (!fd) { */
-                    /*     perror("server (popen)"); */
-                    /*     // send back some kind of error response */
-                    /*     continue; */
-                    /* } */
 
                     char *ip;
                     recstr(connfd, &ip);
@@ -192,15 +186,18 @@ main(int argc, char **argv)
                         msg = htonl(MSG_OK);
                         send(connfd, &msg, sizeof(msg), 0);
 
-                        msg = htonl(MSG_OK);
-                        send(connfd, &msg, sizeof(msg), 0);
+                        char cmd[MAXCMDLEN];
+                        snprintf(cmd, MAXCMDLEN, "moonlight list %s", ip);
 
-                        FILE *fd = fopen("mlist.txt", "r");
+                        FILE *fd = popen(cmd, "r");
                         if (!fd) {
                             perror("server (popen)");
                             // send back some kind of error response
                             continue;
                         }
+
+                        msg = htonl(MSG_OK);
+                        send(connfd, &msg, sizeof(msg), 0);
 
                         // TODO: get a temp file here
                         FILE *listfd = fopen("list.txt", "wb+");
@@ -240,7 +237,7 @@ main(int argc, char **argv)
                         fseek(listfd, 0, SEEK_SET);
                         fwrite(&nlines, sizeof(nlines), 1, listfd);
                         free(line);
-                        fclose(fd);
+                        pclose(fd);
 
                         // send the list
                         // TODO: compress this into the reading
