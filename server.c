@@ -196,12 +196,9 @@ main(int argc, char **argv)
                             continue;
                         }
 
-                        msg = htonl(MSG_OK);
-                        send(connfd, &msg, sizeof(msg), 0);
-
-                        // TODO: get a temp file here
-                        FILE *listfd = fopen("list.txt", "wb+");
-                        if (!listfd) {
+                        char tmplist[] = "list.XXXXXX";
+                        FILE *new_listfd = fdopen(mkstemp(tmplist), "wb+");
+                        if (!new_listfd) {
                             perror("server (msg_list fopen)");
                             continue;
                         }
@@ -209,7 +206,7 @@ main(int argc, char **argv)
                         int nlines = 0;
                         size_t linelen = 0, maxline = 0;
                         char *line = NULL;
-                        fseek(listfd, sizeof(linelen) * 2, SEEK_SET);
+                        fseek(new_listfd, sizeof(linelen) * 2, SEEK_SET);
                         while ((linelen = getline(&line, &linelen, pd)) != -1) {
                             // skip the line if it doesn't start with a number
                             if (!isdigit(line[0])) {
@@ -227,43 +224,77 @@ main(int argc, char **argv)
                                 maxline = linelen;
                             }
 
-                            fwrite(&linelen, sizeof(linelen), 1, listfd);
-                            fwrite(line + i, linelen, 1, listfd);
+                            fwrite(&linelen, sizeof(linelen), 1, new_listfd);
+                            fwrite(line + i, linelen, 1, new_listfd);
 
                             ++nlines;
                         }
 
                         // write the number of lines to the beginning of the file
-                        fseek(listfd, 0, SEEK_SET);
-                        fwrite(&nlines, sizeof(nlines), 1, listfd);
+                        fseek(new_listfd, 0, SEEK_SET);
+                        fwrite(&nlines, sizeof(nlines), 1, new_listfd);
+
+                        fflush(new_listfd);
                         free(line);
                         pclose(pd);
 
-                        // send the list
-                        // TODO: compress this into the reading
-                        //       would have to resize list on client side and figure out how to end transmission
-                        nlines = htonl(nlines);
-                        send(connfd, &nlines, sizeof(nlines), 0);
-                        nlines = ntohl(nlines);
+                        // compare new file to old file to see if list has changed
+                        // TODO: make the list file based on host?
+                        snprintf(cmd, MAXCMDLEN, "cmp %s list.txt", tmplist);
+                        if (system(cmd) != 0) {
+                            printf("server msg_list: list has changed, sending a new copy\n");
+                            msg = htonl(MSG_OK);
+                            send(connfd, &msg, sizeof(msg), 0);
 
-                        char *list = malloc(maxline);
-                        if (!list) {
-                            perror("server msg_list malloc list");
-                            continue;
+                            int save_list = 0;
+                            FILE *old_listfd = fopen("list.txt", "wb");
+                            if (old_listfd) {
+                                save_list = 1;
+                                fwrite(&nlines, sizeof(nlines), 1, old_listfd);
+                                fseek(old_listfd, sizeof(linelen), SEEK_CUR);
+                            } else {
+                                printf("server msg_list: unable to open list for saving\n");
+                            }
+
+                            // send the list
+                            nlines = htonl(nlines);
+                            send(connfd, &nlines, sizeof(nlines), 0);
+                            nlines = ntohl(nlines);
+
+                            char *list = malloc(maxline);
+                            if (!list) {
+                                perror("server msg_list malloc list");
+                                continue;
+                            }
+
+                            fseek(new_listfd, sizeof(nlines) * 2, SEEK_SET);
+                            for (int i = 0; i < nlines; ++i) {
+                                fread(&linelen, sizeof(linelen), 1, new_listfd);
+                                printf("server msg_list: sending linelen: %zu\n", linelen);
+                                fread(list, linelen, 1, new_listfd);
+                                printf("server msg_list: sending line: %s\n", list);
+                                sendstr(connfd, list);
+
+                                if (save_list) {
+                                    fwrite(&linelen, sizeof(linelen), 1, old_listfd);
+                                    fwrite(list, linelen, 1, old_listfd);
+                                }
+                            }
+
+                            if (save_list) {
+                                fclose(old_listfd);
+                            }
+
+                            free(list);
+                        } else {
+                            printf("list hasn't changed, not sending\n");
+                            msg = htonl(MSG_NO);
+                            send(connfd, &msg, sizeof(msg), 0);
                         }
 
-                        fseek(listfd, sizeof(nlines) * 2, SEEK_SET);
-                        for (int i = 0; i < nlines; ++i) {
-                            fread(&linelen, sizeof(linelen), 1, listfd);
-                            printf("server msg_list: sending linelen: %zu\n", linelen);
-                            fread(list, linelen, 1, listfd);
-                            printf("server msg_list: sending line: %s\n", list);
-                            sendstr(connfd, list);
-                        }
-
-                        free(list);
-                        fclose(listfd);
-                        printf("server - finished sending list\n");
+                        fclose(new_listfd);
+                        remove(tmplist);
+                        printf("server msg_list: finished sending list\n");
                     } else {
 
                     }
