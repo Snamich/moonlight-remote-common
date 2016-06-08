@@ -36,6 +36,7 @@
 #define CFG_LOCAL_AUDIO      0x0008
 
 #define CFG_SHIFT                 4
+#define GAME_SHIFT                8
 
 #define DEFAULT_CONFIG ((u32)(CFG_FPS | CFG_RESOLUTION))
 

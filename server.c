@@ -160,6 +160,9 @@ main(int argc, char **argv)
         int listenfd = listenfd_setup();
         uint msg_packed = 0, msg = 0;
 
+        char **gamelist = NULL;
+        u32 gamelist_count = 0;
+
         struct sockaddr_storage their_addr;
         socklen_t addr_size = sizeof(their_addr);
 
@@ -203,10 +206,10 @@ main(int argc, char **argv)
                             continue;
                         }
 
-                        int nlines = 0;
-                        size_t linelen = 0, maxline = 0;
+                        u32 nlines = 0;
+                        size_t linelen = 0;
                         char *line = NULL;
-                        fseek(new_listfd, sizeof(linelen) * 2, SEEK_SET);
+                        fseek(new_listfd, sizeof(linelen), SEEK_SET);
                         while ((linelen = getline(&line, &linelen, pd)) != -1) {
                             // skip the line if it doesn't start with a number
                             if (!isdigit(line[0])) {
@@ -220,9 +223,6 @@ main(int argc, char **argv)
                             // write the size of the string followed by the string itself
                             line[linelen - 1] = '\0';
                             linelen = linelen - i;
-                            if (maxline < linelen) {
-                                maxline = linelen;
-                            }
 
                             fwrite(&linelen, sizeof(linelen), 1, new_listfd);
                             fwrite(line + i, linelen, 1, new_listfd);
@@ -241,7 +241,7 @@ main(int argc, char **argv)
                         // compare new file to old file to see if list has changed
                         // TODO: make the list file based on host?
                         snprintf(cmd, MAXCMDLEN, "cmp %s list.txt", tmplist);
-                        if (system(cmd) != 0) {
+                        if (!gamelist || system(cmd) != 0) {
                             printf("server msg_list: list has changed, sending a new copy\n");
                             msg = htonl(MSG_OK);
                             send(connfd, &msg, sizeof(msg), 0);
@@ -251,9 +251,24 @@ main(int argc, char **argv)
                             if (old_listfd) {
                                 save_list = 1;
                                 fwrite(&nlines, sizeof(nlines), 1, old_listfd);
-                                fseek(old_listfd, sizeof(linelen), SEEK_CUR);
                             } else {
                                 printf("server msg_list: unable to open list for saving\n");
+                            }
+
+                            // free the previous gamelist
+                            // TODO: maybe only free items that have changed? is it worth it?
+                            if (gamelist) {
+                                for (u32 i = 0; i < gamelist_count; ++i) {
+                                    free(gamelist[i]);
+                                }
+
+                                free(gamelist);
+                            }
+
+                            gamelist_count = nlines;
+                            gamelist = malloc(gamelist_count * sizeof(*gamelist));
+                            if (!gamelist) {
+                                perror("server msg_list malloc gamelist");
                             }
 
                             // send the list
@@ -261,33 +276,27 @@ main(int argc, char **argv)
                             send(connfd, &nlines, sizeof(nlines), 0);
                             nlines = ntohl(nlines);
 
-                            char *list = malloc(maxline);
-                            if (!list) {
-                                perror("server msg_list malloc list");
-                                continue;
-                            }
-
-                            fseek(new_listfd, sizeof(nlines) * 2, SEEK_SET);
-                            for (int i = 0; i < nlines; ++i) {
+                            fseek(new_listfd, sizeof(nlines), SEEK_SET);
+                            for (u32 i = 0; i < nlines; ++i) {
                                 fread(&linelen, sizeof(linelen), 1, new_listfd);
                                 printf("server msg_list: sending linelen: %zu\n", linelen);
-                                fread(list, linelen, 1, new_listfd);
-                                printf("server msg_list: sending line: %s\n", list);
-                                sendstr(connfd, list);
+                                gamelist[i] = malloc(linelen);
+
+                                fread(gamelist[i], linelen, 1, new_listfd);
+                                printf("server msg_list: sending line: %s\n", gamelist[i]);
+                                sendstr(connfd, gamelist[i]);
 
                                 if (save_list) {
                                     fwrite(&linelen, sizeof(linelen), 1, old_listfd);
-                                    fwrite(list, linelen, 1, old_listfd);
+                                    fwrite(gamelist[i], linelen, 1, old_listfd);
                                 }
                             }
 
                             if (save_list) {
                                 fclose(old_listfd);
                             }
-
-                            free(list);
                         } else {
-                            printf("list hasn't changed, not sending\n");
+                            printf("server msg_list: list hasn't changed, not sending\n");
                             msg = htonl(MSG_NO);
                             send(connfd, &msg, sizeof(msg), 0);
                         }
@@ -421,36 +430,40 @@ main(int argc, char **argv)
 
                     if (!host_running) {
                         u32 config = (msg_packed >> CFG_SHIFT) & 0x000F;
+                        u32 game_id = (msg_packed >> GAME_SHIFT) & 0x000F;
 
-                        char cmd[MAXCMDLEN];
-                        int total = snprintf(cmd, MAXCMDLEN, "moonlight stream ");
-                        printf("server cmd: %s\n", cmd);
-
-                        char *game;
-                        int game_size = recstr(connfd, &game);
-                        total += snprintf(cmd + total, MAXCMDLEN, "-app %s ", game);
-
-                        total += get_config_str(config, cmd + total, MAXCMDLEN - total);
-
-                        char *ip;
-                        recstr(connfd, &ip);
-                        if (is_valid_ip(ip)) {
+                        if (gamelist && game_id < gamelist_count) {
                             msg = htonl(MSG_OK);
                             send(connfd, &msg, sizeof(msg), 0);
 
-                            total += snprintf(cmd + total, MAXCMDLEN, "%s", ip);
-                            printf("server cmd: %s\n", cmd);
+                            char cmd[MAXCMDLEN];
+                            int total = snprintf(cmd, MAXCMDLEN, "moonlight stream -app %s ", gamelist[game_id]);
 
-                            host_running = !system(cmd);
-                            msg = host_running ? htonl(MSG_OK) : htonl(MSG_NO);
-                            send(connfd, &msg, sizeof(msg), 0);
+                            total += get_config_str(config, cmd + total, MAXCMDLEN - total);
+
+                            char *ip;
+                            recstr(connfd, &ip);
+                            if (is_valid_ip(ip)) {
+                                msg = htonl(MSG_OK);
+                                send(connfd, &msg, sizeof(msg), 0);
+
+                                total += snprintf(cmd + total, MAXCMDLEN, "%s", ip);
+                                printf("server cmd: %s\n", cmd);
+
+                                host_running = !system(cmd);
+                                msg = host_running ? htonl(MSG_OK) : htonl(MSG_NO);
+                                send(connfd, &msg, sizeof(msg), 0);
+                            } else {
+                                msg = htonl(MSG_NO);
+                                send(connfd, &msg, sizeof(msg), 0);
+                            }
+
+                            free(ip);
                         } else {
+                            printf("server msg_launch: invalid game_id sent\n");
                             msg = htonl(MSG_NO);
                             send(connfd, &msg, sizeof(msg), 0);
                         }
-
-                        free(game);
-                        free(ip);
                     } else {
 
                     }

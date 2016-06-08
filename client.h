@@ -1,8 +1,13 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
+typedef struct gamelist_item {
+    char *name;
+    u32 i;
+} gamelist_item;
+
 typedef struct gamelist {
-    char **list;
+    gamelist_item **list;
     u32 count;
 } gamelist;
 
@@ -27,7 +32,7 @@ int pair_cancel(int sockfd);
 int pair_response(int sockfd);
 int unpair(host *host);
 int list(host *host, gamelist *glist);
-int launch(host *host, char *app);
+int launch(host *host, u32 game_id);
 int quit(host *host);
 int hostname(int sockfd, char **str);
 
