@@ -437,7 +437,7 @@ main(int argc, char **argv)
                             send(connfd, &msg, sizeof(msg), 0);
 
                             char cmd[MAXCMDLEN];
-                            int total = snprintf(cmd, MAXCMDLEN, "moonlight stream -app %s ", gamelist[game_id]);
+                            int total = snprintf(cmd, MAXCMDLEN, "moonlight stream -app \"%s\" ", gamelist[game_id]);
 
                             total += get_config_str(config, cmd + total, MAXCMDLEN - total);
 
