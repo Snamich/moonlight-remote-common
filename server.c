@@ -240,9 +240,10 @@ main(int argc, char **argv)
 
                         // compare new file to old file to see if list has changed
                         // TODO: make the list file based on host?
+                        int force_list = (msg_packed >> FORCE_LIST_SHIFT) & 0x000F;
                         snprintf(cmd, MAXCMDLEN, "cmp %s list.txt", tmplist);
-                        if (!gamelist || system(cmd) != 0) {
-                            printf("server msg_list: list has changed, sending a new copy\n");
+                        if (!gamelist || force_list || system(cmd) != 0) {
+                            printf("server msg_list: list has changed or was forced, sending a new copy\n");
                             msg = htonl(MSG_OK);
                             send(connfd, &msg, sizeof(msg), 0);
 

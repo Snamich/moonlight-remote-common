@@ -37,6 +37,7 @@
 
 #define CFG_SHIFT                 4
 #define GAME_SHIFT                8
+#define FORCE_LIST_SHIFT          4
 
 #define DEFAULT_CONFIG ((u32)(CFG_FPS | CFG_RESOLUTION))
 
