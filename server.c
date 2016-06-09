@@ -337,7 +337,7 @@ main(int argc, char **argv)
 
                         size_t linelen = 0;
                         char *line = NULL;
-                        int pair_code;
+                        int pair_code = -1;
                         while ((linelen = getline(&line, &linelen, fd)) != -1) {
                             // find the line the pin is on
                             if (6 < linelen && strncmp(line, "Please", 6) != 0) {
