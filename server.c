@@ -284,7 +284,7 @@ main(int argc, char **argv)
                                 gamelist[i] = malloc(linelen);
 
                                 fread(gamelist[i], linelen, 1, new_listfd);
-                                printf("server msg_list: sending line: %s\n", gamelist[i]);
+                                printf("server msg_list: sending game: %s at spot %d\n", gamelist[i], i);
                                 sendstr(connfd, gamelist[i]);
 
                                 if (save_list) {
@@ -431,7 +431,9 @@ main(int argc, char **argv)
 
                     if (!host_running) {
                         u32 config = (msg_packed >> CFG_SHIFT) & 0x000F;
-                        u32 game_id = (msg_packed >> GAME_SHIFT) & 0x000F;
+                        u32 game_id = (msg_packed >> GAME_SHIFT) & 0x00FF;
+
+                        printf("server msg_launch - launching game_id %d\n", game_id);
 
                         if (gamelist && game_id < gamelist_count) {
                             msg = htonl(MSG_OK);
