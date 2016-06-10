@@ -648,7 +648,7 @@ list(host *host, gamelist *glist)
         goto exit;
     }
 
-    u32 msg = htonl(MSG_LIST | !glist->list ? 1 << FORCE_LIST_SHIFT : 0);
+    u32 msg = htonl(MSG_LIST | (!glist->list ? 1 << FORCE_LIST_SHIFT : 0));
     send(sockfd, &msg, sizeof(msg), 0);
 
     char ip[MAXIPLEN];
