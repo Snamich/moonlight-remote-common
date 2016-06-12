@@ -209,8 +209,9 @@ main(int argc, char **argv)
                         u32 nlines = 0;
                         size_t linelen = 0;
                         char *line = NULL;
+                        ssize_t bytes_read = 0;
                         fseek(new_listfd, sizeof(linelen), SEEK_SET);
-                        while ((linelen = getline(&line, &linelen, pd)) != -1) {
+                        while ((bytes_read = getline(&line, &linelen, pd)) != -1) {
                             // skip the line if it doesn't start with a number
                             if (!isdigit(line[0])) {
                                 continue;
@@ -338,7 +339,8 @@ main(int argc, char **argv)
                         size_t linelen = 0;
                         char *line = NULL;
                         int pair_code = -1;
-                        while ((linelen = getline(&line, &linelen, fd)) != -1) {
+                        ssize_t bytes_read = 0;
+                        while ((bytes_read = getline(&line, &linelen, fd)) != -1) {
                             // find the line the pin is on
                             if (6 < linelen && strncmp(line, "Please", 6) != 0) {
                                 continue;
@@ -360,8 +362,8 @@ main(int argc, char **argv)
                         // check for successful PIN entry or cancellation
                         struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
                         setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval));
-                        while ((linelen = getline(&line, &linelen, fd))) {
-                            if (linelen == -1 && feof(fd)) {
+                        while ((bytes_read = getline(&line, &linelen, fd))) {
+                            if (bytes_read == -1 && feof(fd)) {
                                 clearerr(fd);
                                 if (recv(connfd, &msg, sizeof(msg), 0) != -1) {
                                     msg = ntohl(msg);
