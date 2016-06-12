@@ -218,15 +218,15 @@ main(int argc, char **argv)
                             }
 
                             // find the start of the name
-                            size_t i;
-                            for (i = 0; i < linelen && !isalpha(line[i]); ++i) {}
+                            ssize_t i;
+                            for (i = 0; i < bytes_read && !isalpha(line[i]); ++i) {}
 
-                            // write the size of the string followed by the string itself
-                            line[linelen - 1] = '\0';
-                            linelen = linelen - i;
+                            // remove newline and write the size of the string followed by the string itself
+                            line[bytes_read - 1] = '\0';
+                            bytes_read = bytes_read - i;
 
-                            fwrite(&linelen, sizeof(linelen), 1, new_listfd);
-                            fwrite(line + i, linelen, 1, new_listfd);
+                            fwrite(&bytes_read, sizeof(bytes_read), 1, new_listfd);
+                            fwrite(line + i, bytes_read, 1, new_listfd);
 
                             ++nlines;
                         }
@@ -342,13 +342,13 @@ main(int argc, char **argv)
                         ssize_t bytes_read = 0;
                         while ((bytes_read = getline(&line, &linelen, fd)) != -1) {
                             // find the line the pin is on
-                            if (6 < linelen && strncmp(line, "Please", 6) != 0) {
+                            if (6 < bytes_read && strncmp(line, "Please", 6) != 0) {
                                 continue;
                             }
 
                             // find the start of the name
-                            size_t i;
-                            for (i = 0; i < linelen && !isdigit(line[i]); ++i) {}
+                            ssize_t i;
+                            for (i = 0; i < bytes_read && !isdigit(line[i]); ++i) {}
 
                             pair_code = atoi(line + i);
                             break;
