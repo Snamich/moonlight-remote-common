@@ -342,6 +342,13 @@ tcp_client_setup(moonlight_server *server)
         perror("client (tcp_client_setup socket)");
     }
 
+#ifdef __APPLE__
+    int yes = 1;
+    if (setsockopt(servfd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(int)) == -1) {
+        perror("server (broadcastfd_setup setsockopt)");
+    }
+#endif // APPLE
+
     if (connect(servfd, server_addr, sizeof(*server_addr)) == -1) {
         perror("client (tcp_client_setup connect)");
     }
