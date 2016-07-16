@@ -142,14 +142,14 @@ get_config_str(u32 config, char *str, int size)
 int
 main(int argc, char **argv)
 {
-    pid_t child_pid;
+    pid_t broadcast_pid;
 
-    if ((child_pid = fork()) < 0) {
+    if ((broadcast_pid = fork()) < 0) {
         perror("fork");
         exit(1);
     }
 
-    if (!child_pid) {
+    if (!broadcast_pid) {
         /* child */
         int broadcastfd = broadcastfd_setup();;
         discover(broadcastfd);
