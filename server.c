@@ -3,7 +3,6 @@
 #include <ctype.h>
 
 #define BACKLOG 5
-#define MAXLIST 2
 
 int
 listenfd_setup()
