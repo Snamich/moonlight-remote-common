@@ -738,7 +738,7 @@ launch(host *host, u32 game_id)
         goto exit;
     }
 
-    printf("client - launching game id: %d", game_id);
+    printf("client - launching game id: %d\n", game_id);
     u32 msg = htonl(MSG_LAUNCH | host->config << CFG_SHIFT | game_id << GAME_SHIFT);
     send(sockfd, &msg, sizeof(msg), 0);
 
@@ -752,7 +752,10 @@ launch(host *host, u32 game_id)
         if (ntohl(msg) == MSG_OK) {
             recv(sockfd, &msg, sizeof(msg), 0);
             if (ntohl(msg) == MSG_OK) {
+                printf("host is running\n");
                 rv = 1;
+            } else {
+                printf("error launching host\n");
             }
         }
     }
