@@ -551,27 +551,14 @@ main(int argc, char **argv)
 
                 case MSG_PING:
                 {
-                    /* check if the host is available */
-                    u32 msg;
-                    char *ip;
-                    recstr(connfd, &ip);
-
-                    if (is_valid_ip(ip)) {
+                    /* check if the host is running */
+                    if (host_running) {
                         msg = htonl(MSG_OK);
-                        send(connfd, &msg, sizeof(msg), 0);
-
-                        char cmd[MAXCMDLEN];
-                        int total = snprintf(cmd, MAXCMDLEN, "echo ping ");
-                        snprintf(cmd + total, MAXCMDLEN, "%s", ip);
-
-                        msg = system(cmd) == 0 ? htonl(MSG_OK) : htonl(MSG_NO);
-                        send(connfd, &msg, sizeof(msg), 0);
                     } else {
                         msg = htonl(MSG_NO);
-                        send(connfd, &msg, sizeof(msg), 0);
                     }
 
-                    free(ip);
+                    send(connfd, &msg, sizeof(msg), 0);
                 } break;
 
                 default:

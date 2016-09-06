@@ -814,6 +814,28 @@ hostname(int sockfd, char **str)
 }
 
 int
+ping(host *host)
+{
+    int rv = 0;
+
+    int sockfd = tcp_client_setup(host->server);
+    if (sockfd < 0) {
+        goto exit;
+    }
+
+    u32 msg = htonl(MSG_PING);
+    send(sockfd, &msg, sizeof(msg), 0);
+
+    recv(sockfd, &msg, sizeof(msg), 0);
+    if (ntohl(msg) == MSG_OK) {
+        rv = 1;
+    }
+
+exit:
+    return rv;
+}
+
+int
 get_host_ip(host *host, char *str)
 {
     int rv = snprintf(str, MAXIPLEN, "%s", host->ip);

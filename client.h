@@ -35,6 +35,7 @@ int list(host *host, gamelist *glist);
 int launch(host *host, u32 game_id);
 int quit(host *host);
 int hostname(int sockfd, char **str);
+int ping(host *host);
 
 int get_host_ip(host *host, char *str);
 char *get_server_file(moonlight_server *server);
