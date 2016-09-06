@@ -1,8 +1,12 @@
 #include "common.h"
 
 #include <ctype.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 #define BACKLOG 5
+
+static int host_running = 0;
 
 int
 listenfd_setup()
@@ -139,6 +143,13 @@ get_config_str(u32 config, char *str, int size)
     return rv;
 }
 
+void
+sigchld_handler(int s)
+{
+    while (waitpid(-1, NULL, WNOHANG) > 0);
+    host_running = 0;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -155,7 +166,6 @@ main(int argc, char **argv)
         discover(broadcastfd);
     } else {
         /* parent */
-        int host_running = 0;
         int listenfd = listenfd_setup();
         uint msg_packed = 0, msg = 0;
 
@@ -164,6 +174,16 @@ main(int argc, char **argv)
 
         struct sockaddr_storage their_addr;
         socklen_t addr_size = sizeof(their_addr);
+
+        // set up signal handler for launch process
+        struct sigaction sa;
+        sa.sa_handler = sigchld_handler;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = SA_RESTART;
+        if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+            perror("sigaction");
+            exit(1);
+        }
 
         while (1) {
             // get msg, only handles one client for now
@@ -440,22 +460,39 @@ main(int argc, char **argv)
                             msg = htonl(MSG_OK);
                             send(connfd, &msg, sizeof(msg), 0);
 
-                            char cmd[MAXCMDLEN];
-                            int total = snprintf(cmd, MAXCMDLEN, "moonlight stream -app \"%s\" ", gamelist[game_id]);
-
-                            total += get_config_str(config, cmd + total, MAXCMDLEN - total);
-
                             char *ip;
                             recstr(connfd, &ip);
                             if (is_valid_ip(ip)) {
                                 msg = htonl(MSG_OK);
                                 send(connfd, &msg, sizeof(msg), 0);
 
-                                total += snprintf(cmd + total, MAXCMDLEN, "%s", ip);
-                                printf("server cmd: %s\n", cmd);
+                                pid_t launch_pid;
+                                if (!(launch_pid = fork())) {
+                                    // child
+                                    char *fps, *resolution, *modify_settings, *localaudio;
 
-                                host_running = !system(cmd);
-                                msg = host_running ? htonl(MSG_OK) : htonl(MSG_NO);
+                                    fps = get_config_opt(config, CFG_FPS) ? "60" : "30";
+                                    resolution = get_config_opt(config, CFG_RESOLUTION) ? "-1080" : "-720";
+                                    modify_settings = get_config_opt(config, CFG_MODIFY_SETTINGS) ? "-nsops" : NULL;
+                                    localaudio = get_config_opt(config, CFG_LOCAL_AUDIO) ? "-localaudio" : NULL;
+
+                                    char *arglist[] = { "/usr/bin/moonlight", "stream", "-app", gamelist[game_id],
+                                                        "-fps", fps, resolution, modify_settings, localaudio, ip, NULL };
+
+                                    if (execv(arglist[0], &arglist[0]) == -1) {
+                                        perror("server (msg_launch execv)");
+                                    }
+
+                                    exit(1);
+                                } else if (launch_pid > 0) {
+                                    // parent
+                                    host_running = 1;
+                                    msg = htonl(MSG_OK);
+                                } else {
+                                    // error forking
+                                    msg = htonl(MSG_NO);
+                                }
+
                                 send(connfd, &msg, sizeof(msg), 0);
                             } else {
                                 msg = htonl(MSG_NO);
