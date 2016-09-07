@@ -522,7 +522,7 @@ main(int argc, char **argv)
                             send(connfd, &msg, sizeof(msg), 0);
 
                             char cmd[MAXCMDLEN];
-                            int total = snprintf(cmd, MAXCMDLEN, "echo moonlight quit ");
+                            int total = snprintf(cmd, MAXCMDLEN, "moonlight quit ");
                             snprintf(cmd + total, MAXCMDLEN, "%s", ip);
 
                             host_running = system(cmd);
