@@ -349,7 +349,7 @@ tcp_client_setup(moonlight_server *server)
     }
 #endif // APPLE
 
-    if (connect(servfd, server_addr, sizeof(*server_addr)) == -1) {
+    if (connect(servfd, (const struct sockaddr *)server_addr, sizeof(*server_addr)) == -1) {
         perror("client (tcp_client_setup connect)");
     }
 
@@ -426,7 +426,7 @@ get_server_name(struct sockaddr_in *addr)
         perror("client (get_server_name socket)");
     }
 
-    if (connect(hostfd, addr, sizeof(*addr)) == -1) {
+    if (connect(hostfd, (const struct sockaddr *)addr, sizeof(*addr)) == -1) {
         perror("client (get_server_name connect)");
     }
 
